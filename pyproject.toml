@@ -1,0 +1,34 @@
+[project]
+name = "shooter-analysis"
+version = "0.1.0"
+description = "FRC 2026 Shooter Analysis with Air Resistance"
+requires-python = ">=3.9"
+dependencies = [
+    "numpy>=1.24.0",
+    "matplotlib>=3.7.0",
+]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.1.0",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py39"
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "F",    # pyflakes
+    "I",    # isort
+    "N",    # pep8-naming
+]
+ignore = [
+    "E501",  # line too long (handled by formatter)
+    "E402",  # module level import not at top
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["shooter"]
