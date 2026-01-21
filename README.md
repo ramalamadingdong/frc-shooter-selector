@@ -4,7 +4,8 @@ This project performs comprehensive ballistics analysis for the FRC 2026 shooter
 
 ## Features
 
-- **Web Interface** - Modern Django web application with interactive UI
+- **Web Interface** - Static web application hosted on GitHub Pages (no server required!)
+- **Django Web Application** - Full Django version for local development
 - **Command Line Tool** - Original Python script for batch analysis
 - **Air resistance modeling** - Accounts for quadratic drag on foam game pieces
 - **Conservative motor torque** - Uses peak torque values (not stall) for sustainable operation
@@ -12,6 +13,22 @@ This project performs comprehensive ballistics analysis for the FRC 2026 shooter
 - **Comprehensive sensitivity analysis** - Shows impact of velocity and angle errors
 - **Spin-up time analysis** - Calculates across different gear ratios
 - **Flywheel configurations** - Compares different mass options
+
+## Quick Start (GitHub Pages)
+
+The easiest way to use this tool is via GitHub Pages:
+
+1. **Enable GitHub Pages** in your repository settings:
+   - Go to Settings → Pages
+   - Select "Deploy from a branch"
+   - Choose "main" branch and "/ (root)" folder
+   - Click Save
+
+2. **Access the tool**:
+   - After GitHub Pages is enabled, visit: `https://YOUR_USERNAME.github.io/frc-shooter-selector/`
+   - The tool runs entirely in your browser - no server needed!
+
+The static version (`index.html`) includes all physics calculations converted to JavaScript, so it works completely client-side.
 
 ## Setup
 
@@ -57,9 +74,10 @@ This project performs comprehensive ballistics analysis for the FRC 2026 shooter
 
 ## Project Structure
 
+- `index.html` - **Static web application for GitHub Pages** (all calculations run in browser)
 - `shooter_web/` - Django project settings
 - `shooter/` - Django app with views, URLs, and physics module
-- `templates/shooter/` - HTML templates
+- `templates/shooter/` - Django HTML templates
 - `shooter_tuning_tool.py` - Interactive command-line tool
 - `shooter_with_drag.py` - Detailed analysis script
 - `shooter/physics.py` - Core physics functions (shared between CLI and web)
