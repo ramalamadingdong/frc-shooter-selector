@@ -195,22 +195,6 @@ def get_user_configuration():
             print("Invalid input. Please enter a number.")
 
     print()
-
-    # Thermal derating
-    while True:
-        derating_input = input("Thermal derating factor [0.80]: ").strip()
-        if derating_input == "":
-            thermal_derating = 0.80
-            break
-        try:
-            thermal_derating = float(derating_input)
-            if 0.5 <= thermal_derating <= 1.0:
-                break
-            print("Thermal derating should be between 0.5 and 1.0.")
-        except ValueError:
-            print("Invalid input. Please enter a number.")
-
-    print()
     print("=" * 80)
     print("CONFIGURATION SUMMARY")
     print("=" * 80)
@@ -219,7 +203,6 @@ def get_user_configuration():
     print(f"Current Limit: {current_limit}A per motor")
     print(f"Idle Speed: {idle_speed} RPM")
     print(f"Efficiency: {efficiency}")
-    print(f"Thermal Derating: {thermal_derating}")
     print()
 
     # Confirmation
@@ -239,7 +222,6 @@ def get_user_configuration():
         'motor_num_motors': num_motors,
         'motor_current_limit_a': current_limit,
         'motor_efficiency': efficiency,
-        'motor_thermal_derating': thermal_derating,
         'selected_angle': selected_angle if selected_angle != 65 else None,  # None means use optimal
         'idle_speed_rpm': idle_speed,
     }
@@ -292,14 +274,12 @@ MOTOR_STALL_CURRENT_A = config['motor_stall_current_a']
 MOTOR_NUM_MOTORS = config['motor_num_motors']
 MOTOR_CURRENT_LIMIT_A = config['motor_current_limit_a']
 MOTOR_EFFICIENCY = config['motor_efficiency']
-MOTOR_THERMAL_DERATING = config['motor_thermal_derating']
-
 # Derived motor constants (calculated from user inputs)
 MOTOR_FREE_SPEED_RADS = MOTOR_FREE_SPEED_RPM * 2 * np.pi / 60
 MOTOR_KT = MOTOR_STALL_TORQUE_NM / MOTOR_STALL_CURRENT_A  # Torque constant (N·m/A)
 MOTOR_TORQUE_AT_CURRENT_LIMIT = MOTOR_CURRENT_LIMIT_A * MOTOR_KT  # Torque at current limit
-# Use the LESSER of peak torque or current-limited torque, then apply derating
-MOTOR_USABLE_TORQUE = min(MOTOR_PEAK_TORQUE_NM, MOTOR_TORQUE_AT_CURRENT_LIMIT) * MOTOR_THERMAL_DERATING
+# Use the LESSER of peak torque or current-limited torque
+MOTOR_USABLE_TORQUE = min(MOTOR_PEAK_TORQUE_NM, MOTOR_TORQUE_AT_CURRENT_LIMIT)
 
 # =============================================================================
 # IDLE SPEED CONFIGURATION
@@ -723,7 +703,6 @@ print(f"  Free speed: {MOTOR_FREE_SPEED_RPM} RPM")
 print(f"  Stall torque: {MOTOR_STALL_TORQUE_NM} N·m (reference only)")
 print(f"  Peak sustainable torque: {MOTOR_PEAK_TORQUE_NM} N·m (~50% of stall)")
 print(f"  Current limit: {MOTOR_CURRENT_LIMIT_A}A → {MOTOR_TORQUE_AT_CURRENT_LIMIT:.2f} N·m")
-print(f"  Thermal derating: {MOTOR_THERMAL_DERATING*100:.0f}%")
 print(f"  Usable torque per motor: {MOTOR_USABLE_TORQUE:.2f} N·m")
 print(f"  Total usable torque: {MOTOR_USABLE_TORQUE * MOTOR_NUM_MOTORS:.2f} N·m")
 
@@ -841,11 +820,11 @@ def calc_spinup_time(target_rpm, gear_ratio, I_system):
 
     while omega < motor_target_rad_s and t < 5:
         # Calculate torque from motor curve (linear from stall to free speed)
-        # But cap at the usable torque (considering current limit + thermal derating)
+        # But cap at the usable torque (considering current limit)
         speed_fraction = omega / MOTOR_FREE_SPEED_RADS
         tau_from_curve = MOTOR_STALL_TORQUE_NM * (1 - speed_fraction)
 
-        # Apply all limits: peak torque, current limit, and thermal derating
+        # Apply all limits: peak torque and current limit
         tau_motor = min(tau_from_curve, MOTOR_USABLE_TORQUE)
 
         # Total torque from all motors
@@ -858,7 +837,7 @@ def calc_spinup_time(target_rpm, gear_ratio, I_system):
     return t
 
 print(f"\nUsing recommended flywheel mass: {I_recommended_lbin2:.1f} lb·in²")
-print(f"{MOTOR_NUM_MOTORS}x {MOTOR_NAME} motors, {MOTOR_CURRENT_LIMIT_A}A limit, {MOTOR_THERMAL_DERATING*100:.0f}% thermal derating")
+print(f"{MOTOR_NUM_MOTORS}x {MOTOR_NAME} motors, {MOTOR_CURRENT_LIMIT_A}A limit")
 if IDLE_SPEED_RPM > 0:
     print(f"Idle speed: {IDLE_SPEED_RPM} RPM (spin-up measured from idle)")
 else:
@@ -1090,7 +1069,7 @@ print(f"""
 ║    • Type: {MOTOR_NUM_MOTORS}x {MOTOR_NAME} (one per wheel shaft)                                 ║
 ║    • Gearing: 2:1 reduction recommended (faster spin-up, good headroom)        ║
 ║    • Current limit: {MOTOR_CURRENT_LIMIT_A}A per motor                                            ║
-║    • Thermal derating: {MOTOR_THERMAL_DERATING*100:.0f}% (using {MOTOR_USABLE_TORQUE:.1f} N·m of {MOTOR_STALL_TORQUE_NM:.1f} N·m stall)              ║
+║    • Using {MOTOR_USABLE_TORQUE:.1f} N·m per motor (peak torque, limited by {MOTOR_CURRENT_LIMIT_A}A current limit)              ║
 ╠════════════════════════════════════════════════════════════════════════════════╣
 ║  WHEEL SPEED REQUIREMENTS                                                      ║
 ║    • RPM range: {min_rpm:.0f} - {max_rpm:.0f} RPM                                              ║
@@ -1116,7 +1095,6 @@ print(f"""
 
 ⚠️  NOTE: Motor calculations use CONSERVATIVE (peak) torque values:
     • Using {MOTOR_USABLE_TORQUE:.1f} N·m per motor (not {MOTOR_STALL_TORQUE_NM:.1f} N·m stall torque)
-    • {MOTOR_THERMAL_DERATING*100:.0f}% thermal derating applied for sustained operation
     • Current limit: {MOTOR_CURRENT_LIMIT_A}A per motor
     • This ensures motors won't overheat during extended use
 """)

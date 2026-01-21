@@ -1,0 +1,1019 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FRC 2026 Shooter Tuning Tool</title>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: #0d1117;
+            min-height: 100vh;
+            padding: 20px;
+            color: #e6edf3;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        .header {
+            background: #161b22;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+            margin-bottom: 20px;
+            text-align: center;
+            border: 1px solid #30363d;
+        }
+        .header h1 {
+            color: #e6edf3;
+            margin-bottom: 10px;
+        }
+        .header p {
+            color: #8b949e;
+        }
+        .system-info {
+            background: #161b22;
+            padding: 25px;
+            border-radius: 10px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+            margin-bottom: 20px;
+            border: 1px solid #30363d;
+        }
+        .system-info h2 {
+            color: #e6edf3;
+            margin-bottom: 15px;
+            font-size: 20px;
+        }
+        .system-info p {
+            color: #8b949e;
+            line-height: 1.6;
+            margin-bottom: 10px;
+        }
+        .system-info ul {
+            color: #8b949e;
+            margin-left: 20px;
+            margin-bottom: 10px;
+            line-height: 1.8;
+        }
+        .system-info li {
+            margin-bottom: 5px;
+        }
+        .system-info .highlight {
+            color: #58a6ff;
+            font-weight: 600;
+        }
+        .main-content {
+            display: grid;
+            grid-template-columns: 400px 1fr;
+            gap: 20px;
+        }
+        .config-panel {
+            background: #161b22;
+            padding: 25px;
+            border-radius: 10px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+            height: fit-content;
+            position: sticky;
+            top: 20px;
+            border: 1px solid #30363d;
+        }
+        .results-panel {
+            background: #161b22;
+            padding: 25px;
+            border-radius: 10px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+            min-height: 600px;
+            border: 1px solid #30363d;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #e6edf3;
+            font-size: 14px;
+        }
+        .form-group select,
+        .form-group input {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #30363d;
+            border-radius: 5px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+            background: #0d1117;
+            color: #e6edf3;
+        }
+        .form-group select:focus,
+        .form-group input:focus {
+            outline: none;
+            border-color: #58a6ff;
+        }
+        .form-group small {
+            display: block;
+            margin-top: 5px;
+            color: #8b949e;
+            font-size: 12px;
+        }
+        .btn {
+            background: linear-gradient(135deg, #238636 0%, #2ea043 100%);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 5px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            width: 100%;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(46, 160, 67, 0.4);
+        }
+        .btn:active {
+            transform: translateY(0);
+        }
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #8b949e;
+        }
+        .results-section {
+            margin-bottom: 30px;
+        }
+        .results-section h2 {
+            color: #e6edf3;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #30363d;
+        }
+        .metric-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .metric-card {
+            background: #21262d;
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 4px solid #58a6ff;
+            position: relative;
+            cursor: help;
+        }
+        .metric-card .label {
+            font-size: 12px;
+            color: #8b949e;
+            text-transform: uppercase;
+            margin-bottom: 5px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .metric-card .label::after {
+            content: '?';
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: #484f58;
+            color: #8b949e;
+            font-size: 10px;
+            font-weight: bold;
+        }
+        .metric-card:hover .label::after {
+            background: #58a6ff;
+            color: white;
+        }
+        .metric-card .value {
+            font-size: 24px;
+            font-weight: 700;
+            color: #e6edf3;
+        }
+        .metric-card .tooltip {
+            visibility: hidden;
+            opacity: 0;
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #30363d;
+            color: #e6edf3;
+            padding: 10px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 400;
+            line-height: 1.4;
+            width: 220px;
+            text-align: left;
+            z-index: 100;
+            margin-bottom: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+            transition: opacity 0.2s, visibility 0.2s;
+        }
+        .metric-card .tooltip::after {
+            content: '';
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            border: 8px solid transparent;
+            border-top-color: #30363d;
+        }
+        .metric-card:hover .tooltip {
+            visibility: visible;
+            opacity: 1;
+        }
+        .status-icon {
+            display: inline-block;
+            margin-left: 10px;
+            font-weight: bold;
+        }
+        .status-ok { color: #3fb950; }
+        .status-warn { color: #d29922; }
+        .status-error { color: #f85149; }
+        .table-container {
+            overflow-x: auto;
+            margin-top: 15px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #30363d;
+            color: #e6edf3;
+        }
+        th {
+            background: #21262d;
+            font-weight: 600;
+            color: #e6edf3;
+        }
+        td {
+            background: #161b22;
+        }
+        tr:hover td {
+            background: #21262d;
+        }
+        .chart-container {
+            margin-top: 20px;
+            height: 400px;
+        }
+        .recommendations {
+            background: #2d2a1d;
+            border-left: 4px solid #d29922;
+            padding: 15px;
+            border-radius: 5px;
+            margin-top: 20px;
+        }
+        .recommendations h3 {
+            margin-bottom: 10px;
+            color: #d29922;
+        }
+        .recommendations ul {
+            margin-left: 20px;
+            color: #e3b341;
+        }
+        .recommendations li {
+            margin-bottom: 5px;
+        }
+        .error {
+            background: #2d1b1b;
+            border-left: 4px solid #f85149;
+            padding: 15px;
+            border-radius: 5px;
+            color: #f85149;
+        }
+        .code-block {
+            background: #0d1117;
+            padding: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
+            border: 1px solid #30363d;
+        }
+        .code-block code {
+            color: #79c0ff;
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+        @media (max-width: 1024px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+            .config-panel {
+                position: static;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>FRC 2026 Shooter Tuning Tool</h1>
+            <p>Interactive tool for optimizing shooter parameters with real-time feedback</p>
+        </div>
+        
+        <div class="system-info">
+            <h2>System Overview</h2>
+            <p>
+                This tool analyzes a <span class="highlight">two-wheel shooter system</span> commonly used in FRC robotics competitions. 
+                The system consists of:
+            </p>
+            <ul>
+                <li><strong>Two sides/axes</strong> - The shooter has two independent sides (left and right), each with its own wheel assembly</li>
+                <li><strong>Wheels per side</strong> - Each side can have one or more wheels mounted on the same axis (typically 1-2 wheels per side)</li>
+                <li><strong>Motors per side</strong> - Each side is driven by one or more motors connected in parallel to share the load</li>
+                <li><strong>Flywheel assembly</strong> - Each wheel assembly has a flywheel attached to store rotational energy and maintain consistent ball exit velocity</li>
+                <li><strong>Gear reduction</strong> - Motors are connected to the wheel axis through a gearbox to optimize torque and speed</li>
+                <li><strong>Ball compression</strong> - The ball is compressed between the two counter-rotating sides, creating friction that transfers energy</li>
+            </ul>
+            <p>
+                <strong>System Architecture:</strong> In a typical two-wheel shooter, you have two sides (left and right) that rotate in opposite 
+                directions. Each side consists of a wheel assembly mounted on a common axis. The wheel assembly can have one wheel (single wheel 
+                per side) or multiple wheels stacked together (dual/triple wheel configuration). All wheels on the same side rotate together 
+                at the same RPM, driven by one or more motors connected through a gearbox. The flywheel is typically attached to the same axis 
+                as the wheels to store rotational energy.
+            </p>
+            <p>
+                <strong>How it works:</strong> The ball is fed between the two counter-rotating sides. As the wheels spin, they compress 
+                the ball and transfer rotational energy through friction. The ball exits at a velocity determined by the wheel surface speed 
+                and compression characteristics. Each side operates independently with its own motor(s), gearbox, and flywheel, allowing for 
+                precise control of exit velocity.
+            </p>
+            <p>
+                <strong>Analysis:</strong> This tool calculates optimal shooter angles, required wheel RPMs for different distances (8-20 feet), 
+                and evaluates system performance metrics including spin-up time, speed consistency, and motor headroom. The analysis accounts 
+                for air drag, ball compression/slip between sides, and flywheel energy storage effects. All motor and gear ratio specifications 
+                are per-side (each side has its own motor configuration). The number of wheels per side affects the total moment of inertia 
+                (MOI) of the flywheel assembly.
+            </p>
+        </div>
+        
+        <div class="main-content">
+            <div class="config-panel">
+                <h2 style="margin-bottom: 20px; color: #e6edf3;">Configuration</h2>
+                <form id="configForm">
+                    <div class="form-group">
+                        <label for="motor">Motor Type</label>
+                        <select id="motor" name="motor">
+                            {% for key, motor in motor_presets.items %}
+                            <option value="{{ key }}" data-name="{{ motor.name }}" 
+                                    data-free-speed="{{ motor.free_speed_rpm }}"
+                                    data-stall-torque="{{ motor.stall_torque_nm }}"
+                                    data-peak-torque="{{ motor.peak_torque_nm }}"
+                                    data-stall-current="{{ motor.stall_current_a }}"
+                                    data-current-limit="{{ motor.default_current_limit }}">
+                                {{ motor.name }} ({{ motor.free_speed_rpm }} RPM)
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="wheels_per_side">Wheels per Side</label>
+                        <input type="number" id="wheels_per_side" name="wheels_per_side" value="1" min="1" max="3">
+                        <small>Number of wheels mounted on each side/axis (1 = single wheel, 2+ = stacked wheels)</small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="motor_num_motors">Motors per Side</label>
+                        <input type="number" id="motor_num_motors" name="motor_num_motors" value="2" min="1" max="4">
+                        <small>Number of motors driving each side (motors are connected in parallel on the same axis)</small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="motor_current_limit">Current Limit (A)</label>
+                        <input type="number" id="motor_current_limit" name="motor_current_limit" value="40" step="1" min="10" max="100">
+                        <small>Maximum current per motor to prevent overheating</small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="gear_ratio">Gear Ratio</label>
+                        <input type="number" id="gear_ratio" name="gear_ratio" value="2.0" step="0.1" min="0.1" max="10.0">
+                        <small>Motor speed reduction ratio (higher = more torque, lower wheel RPM)</small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="flywheel">Flywheel Configuration</label>
+                        <select id="flywheel" name="flywheel">
+                            {% for key, fw in flywheel_presets.items %}
+                            <option value="{{ key }}" data-moi="{% if fw.moi_lb_in2 %}{{ fw.moi_lb_in2 }}{% endif %}" data-name="{{ fw.name }}"
+                                    {% if key == '4' %}selected{% endif %}>
+                                {{ fw.name }}{% if fw.moi_lb_in2 %} ({{ fw.moi_lb_in2 }} lb-in²){% endif %}
+                            </option>
+                            {% endfor %}
+                        </select>
+                        <small>Flywheel mass affects energy storage and speed consistency</small>
+                    </div>
+                    
+                    <div class="form-group" id="custom_moi_group" style="display: none;">
+                        <label for="custom_moi">Custom MOI (lb-in²)</label>
+                        <input type="number" id="custom_moi" name="custom_moi" value="10.0" step="0.1" min="1" max="50">
+                        <small>Moment of inertia of your custom flywheel assembly</small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="selected_angle">Shooter Angle (deg)</label>
+                        <input type="number" id="selected_angle" name="selected_angle" step="1" min="50" max="75" placeholder="Optimal">
+                        <small>Launch angle of shooter mechanism (leave empty to find optimal)</small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="idle_speed">Idle Speed (RPM)</label>
+                        <input type="number" id="idle_speed" name="idle_speed" value="500" step="10" min="0" max="3000">
+                        <small>Wheel RPM when shooter is idle (reduces spin-up time)</small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="drag_coefficient">Drag Coefficient</label>
+                        <input type="number" id="drag_coefficient" name="drag_coefficient" value="0.50" step="0.01" min="0.3" max="0.7">
+                        <small>Air resistance coefficient (foam ball typically ~0.5)</small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="slip_factor">Slip/Compression Factor</label>
+                        <input type="number" id="slip_factor" name="slip_factor" value="1.15" step="0.01" min="1.0" max="1.3">
+                        <small>
+                            Ratio of wheel surface speed to ball exit velocity. Accounts for ball compression (ball deforms when squeezed, reducing effective contact radius) and slip between ball and wheels. 
+                            Formula: wheel_surface_speed = ball_exit_velocity × slip_factor. 
+                            Typical values: 1.0 = no slip/compression (ideal), 1.10-1.20 = typical for foam balls, 1.15 = recommended default.
+                        </small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="wheel_type">Wheel Type</label>
+                        <select id="wheel_type" name="wheel_type">
+                            {% for key, wheel in wheel_presets.items %}
+                            <option value="{{ key }}" data-moi="{% if wheel.moi_lb_in2 %}{{ wheel.moi_lb_in2 }}{% endif %}" data-diameter="{% if wheel.diameter_in %}{{ wheel.diameter_in }}{% endif %}"
+                                    {% if key == '1' %}selected{% endif %}>
+                                {{ wheel.name }}{% if wheel.moi_lb_in2 %} ({{ wheel.moi_lb_in2 }} lb-in²){% endif %}
+                            </option>
+                            {% endfor %}
+                        </select>
+                        <small>Select wheel type - diameter and MOI will be set automatically</small>
+                    </div>
+                    
+                    <div class="form-group" id="custom_wheel_moi_group" style="display: none;">
+                        <label for="custom_wheel_moi">Custom Wheel MOI (lb-in²)</label>
+                        <input type="number" id="custom_wheel_moi" name="custom_wheel_moi" value="0.9" step="0.1" min="0.1" max="5.0">
+                        <small>Moment of inertia for your custom wheel</small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="wheel_diameter">Wheel Diameter (inches)</label>
+                        <input type="number" id="wheel_diameter" name="wheel_diameter" value="4.0" step="0.1" min="2.0" max="8.0">
+                        <small>Diameter of the shooter wheels (auto-updated when wheel type is selected)</small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="motor_efficiency">Motor Efficiency</label>
+                        <input type="number" id="motor_efficiency" name="motor_efficiency" value="0.85" step="0.01" min="0.5" max="1.0">
+                        <small>Mechanical efficiency of motor and gearbox (typically 0.80-0.90)</small>
+                    </div>
+                    
+                    <button type="submit" class="btn" id="analyzeBtn">Run Analysis</button>
+                </form>
+            </div>
+            
+            <div class="results-panel" id="resultsPanel">
+                <div class="loading" id="loading" style="display: none;">
+                    <p>Running analysis...</p>
+                </div>
+                <div id="resultsContent"></div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        const form = document.getElementById('configForm');
+        const resultsContent = document.getElementById('resultsContent');
+        const loading = document.getElementById('loading');
+        const analyzeBtn = document.getElementById('analyzeBtn');
+        const flywheelSelect = document.getElementById('flywheel');
+        const customMoiGroup = document.getElementById('custom_moi_group');
+        const wheelTypeSelect = document.getElementById('wheel_type');
+        const customWheelMoiGroup = document.getElementById('custom_wheel_moi_group');
+        const wheelDiameterInput = document.getElementById('wheel_diameter');
+        
+        flywheelSelect.addEventListener('change', function() {
+            if (this.value === '6') {
+                customMoiGroup.style.display = 'block';
+            } else {
+                customMoiGroup.style.display = 'none';
+            }
+        });
+        
+        // Initialize wheel type dropdown on page load
+        wheelTypeSelect.dispatchEvent(new Event('change'));
+        
+        wheelTypeSelect.addEventListener('change', function() {
+            const selectedOption = this.options[this.selectedIndex];
+            const diameter = selectedOption.dataset.diameter;
+            const moi = selectedOption.dataset.moi;
+            
+            if (this.value === '24') {
+                // Custom wheel selected
+                customWheelMoiGroup.style.display = 'block';
+            } else {
+                customWheelMoiGroup.style.display = 'none';
+                if (diameter) {
+                    wheelDiameterInput.value = diameter;
+                }
+            }
+        });
+        
+        // Update current limit when motor changes
+        document.getElementById('motor').addEventListener('change', function() {
+            const selectedMotor = this.options[this.selectedIndex];
+            document.getElementById('motor_current_limit').value = selectedMotor.dataset.currentLimit;
+        });
+        
+        form.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const motorSelect = document.getElementById('motor');
+            const selectedMotor = motorSelect.options[motorSelect.selectedIndex];
+            
+            const config = {
+                motor_name: selectedMotor.dataset.name,
+                motor_free_speed_rpm: parseFloat(selectedMotor.dataset.freeSpeed),
+                motor_stall_torque_nm: parseFloat(selectedMotor.dataset.stallTorque),
+                motor_peak_torque_nm: parseFloat(selectedMotor.dataset.peakTorque),
+                motor_stall_current_a: parseFloat(selectedMotor.dataset.stallCurrent),
+                wheels_per_side: parseInt(document.getElementById('wheels_per_side').value),
+                motor_num_motors: parseInt(document.getElementById('motor_num_motors').value),
+                motor_current_limit_a: parseFloat(document.getElementById('motor_current_limit').value),
+                motor_efficiency: parseFloat(document.getElementById('motor_efficiency').value),
+                idle_speed_rpm: parseFloat(document.getElementById('idle_speed').value),
+                gear_ratio: parseFloat(document.getElementById('gear_ratio').value),
+                drag_coefficient: parseFloat(document.getElementById('drag_coefficient').value),
+                slip_factor: parseFloat(document.getElementById('slip_factor').value),
+                wheel_diameter_in: parseFloat(document.getElementById('wheel_diameter').value),
+            };
+            
+            // Handle wheel type selection
+            const wheelTypeSelect = document.getElementById('wheel_type');
+            const selectedWheel = wheelTypeSelect.options[wheelTypeSelect.selectedIndex];
+            config.wheel_type = wheelTypeSelect.value;
+            if (wheelTypeSelect.value === '24') {
+                // Custom wheel - use custom MOI
+                config.wheel_moi_lb_in2 = parseFloat(document.getElementById('custom_wheel_moi').value);
+            } else {
+                // Use preset MOI (will be calculated from wheel_type in backend)
+                config.wheel_moi_lb_in2 = null;
+            }
+            
+            const angleInput = document.getElementById('selected_angle').value;
+            config.selected_angle = angleInput ? parseFloat(angleInput) : null;
+            
+            const flywheelSelect = document.getElementById('flywheel');
+            const selectedFlywheel = flywheelSelect.options[flywheelSelect.selectedIndex];
+            config.flywheel_name = selectedFlywheel.dataset.name;
+            
+            if (flywheelSelect.value === '6') {
+                config.flywheel_moi_lb_in2 = parseFloat(document.getElementById('custom_moi').value);
+            } else {
+                config.flywheel_moi_lb_in2 = parseFloat(selectedFlywheel.dataset.moi);
+            }
+            
+            loading.style.display = 'block';
+            resultsContent.innerHTML = '';
+            analyzeBtn.disabled = true;
+            
+            try {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 120000);
+                
+                const response = await fetch('/api/analyze', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(config),
+                    signal: controller.signal
+                });
+                
+                clearTimeout(timeoutId);
+                
+                if (!response.ok) {
+                    let errorMsg = `Server error: ${response.status} ${response.statusText}`;
+                    try {
+                        const errorData = await response.json();
+                        if (errorData.error) {
+                            errorMsg = errorData.error;
+                        }
+                    } catch (e) {
+                        const text = await response.text();
+                        if (text) {
+                            errorMsg = text.substring(0, 200);
+                        }
+                    }
+                    resultsContent.innerHTML = `<div class="error"><strong>Error:</strong> ${errorMsg}</div>`;
+                    return;
+                }
+                
+                const data = await response.json();
+                
+                if (data.error) {
+                    resultsContent.innerHTML = `<div class="error"><strong>Error:</strong> ${data.error}</div>`;
+                } else {
+                    try {
+                        displayResults(data.config, data.results);
+                    } catch (displayError) {
+                        console.error('Error displaying results:', displayError);
+                        resultsContent.innerHTML = `<div class="error"><strong>Error displaying results:</strong> ${displayError.message}<br><small>Check console for details</small></div>`;
+                    }
+                }
+            } catch (error) {
+                let errorMsg = error.message;
+                if (error.name === 'AbortError') {
+                    errorMsg = 'Request timed out after 120 seconds. The analysis may be taking too long. Try adjusting parameters or check server logs.';
+                } else if (error.name === 'TypeError' && error.message.includes('fetch')) {
+                    errorMsg = 'Network error: Could not connect to server. Make sure the server is running.';
+                }
+                resultsContent.innerHTML = `<div class="error"><strong>Error:</strong> ${errorMsg}</div>`;
+                console.error('Analysis error:', error);
+            } finally {
+                loading.style.display = 'none';
+                analyzeBtn.disabled = false;
+            }
+        });
+        
+        function getCookie(name) {
+            let cookieValue = null;
+            if (document.cookie && document.cookie !== '') {
+                const cookies = document.cookie.split(';');
+                for (let i = 0; i < cookies.length; i++) {
+                    const cookie = cookies[i].trim();
+                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                        break;
+                    }
+                }
+            }
+            return cookieValue;
+        }
+        
+        function statusIcon(value, good, warn, lowerBetter = true) {
+            if (lowerBetter) {
+                if (value <= good) return '<span class="status-icon status-ok">[OK]</span>';
+                if (value <= warn) return '<span class="status-icon status-warn">[!]</span>';
+                return '<span class="status-icon status-error">[X]</span>';
+            } else {
+                if (value >= good) return '<span class="status-icon status-ok">[OK]</span>';
+                if (value >= warn) return '<span class="status-icon status-warn">[!]</span>';
+                return '<span class="status-icon status-error">[X]</span>';
+            }
+        }
+        
+        function displayResults(config, results) {
+            if (!config || !results) {
+                throw new Error('Missing config or results data');
+            }
+            
+            if (results.error) {
+                resultsContent.innerHTML = `<div class="error">${results.error}</div>`;
+                return;
+            }
+            
+            // Validate required fields
+            if (!results.shot_data || !results.wheel_rpms || !results.all_angles) {
+                throw new Error('Invalid results structure. Missing required fields.');
+            }
+            
+            let html = `
+                <div class="results-section">
+                    <h2>Configuration Summary</h2>
+                    <div class="metric-grid">
+                        <div class="metric-card">
+                            <div class="tooltip">The motor type driving each wheel assembly. Different motors have different free speeds, torque characteristics, and current limits.</div>
+                            <div class="label">Motor</div>
+                            <div class="value">${config.motor_name}</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="tooltip">Number of motors connected in parallel driving each side. More motors = more torque and faster spin-up, but higher weight and cost.</div>
+                            <div class="label">Motors per Side</div>
+                            <div class="value">${config.motor_num_motors}</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="tooltip">Number of wheels stacked on each side/axis. More wheels increase total moment of inertia and contact area with the ball.</div>
+                            <div class="label">Wheels per Side</div>
+                            <div class="value">${config.wheels_per_side || 1}</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="tooltip">Motor-to-wheel gear reduction ratio. Higher ratio = more torque but lower max wheel RPM. Lower ratio = higher speed but less torque.</div>
+                            <div class="label">Gear Ratio</div>
+                            <div class="value">${config.gear_ratio}:1</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="tooltip">The flywheel configuration adding rotational mass to each side. More mass = more energy storage and consistent shots, but slower spin-up.</div>
+                            <div class="label">Flywheel</div>
+                            <div class="value">${config.flywheel_name}</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="tooltip">Total Moment of Inertia per side (flywheel + wheels). Higher MOI stores more energy for consistent multi-shot accuracy but takes longer to spin up.</div>
+                            <div class="label">Total MOI</div>
+                            <div class="value">${results.total_moi_lb_in2.toFixed(1)} lb-in²</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="results-section">
+                    <h2>Performance Metrics</h2>
+                    <div class="metric-grid">
+                        <div class="metric-card">
+                            <div class="tooltip">The launch angle of the shooter mechanism. The optimal angle minimizes sensitivity to velocity and angle errors across all distances.</div>
+                            <div class="label">Selected Angle</div>
+                            <div class="value">${results.selected_angle}° ${results.selected_angle === results.optimal_angle ? '(optimal)' : `(optimal: ${results.optimal_angle}°)`}</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="tooltip">Combined score measuring shot consistency. Lower is better. Accounts for velocity sensitivity, angle sensitivity, and velocity range needed. Target: &lt;4.0 (good), &lt;6.0 (acceptable).</div>
+                            <div class="label">Consistency Score</div>
+                            <div class="value">${results.selected_score.toFixed(2)} ${statusIcon(results.selected_score, 4.0, 6.0)}</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="tooltip">How much the landing position changes per 1 m/s change in exit velocity. Lower means more forgiving of speed errors. Target: &lt;1.0 m/(m/s) (good), &lt;1.5 (acceptable).</div>
+                            <div class="label">Velocity Sensitivity</div>
+                            <div class="value">${results.sens_v_mean.toFixed(3)} m/(m/s) ${statusIcon(results.sens_v_mean, 1.0, 1.5)}</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="tooltip">How much the landing position changes per 1 degree change in launch angle. Lower means more forgiving of angle errors. Target: &lt;0.1 m/deg (good), &lt;0.2 (acceptable).</div>
+                            <div class="label">Angle Sensitivity</div>
+                            <div class="value">${results.sens_a_mean.toFixed(3)} m/deg ${statusIcon(results.sens_a_mean, 0.1, 0.2)}</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="tooltip">The range of wheel RPMs needed to cover all shooting distances (8-20 ft). A narrower range means simpler control but the absolute values matter for motor selection.</div>
+                            <div class="label">RPM Range</div>
+                            <div class="value">${results.min_rpm.toFixed(0)} - ${results.max_rpm.toFixed(0)} RPM</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="tooltip">Percentage of motor free speed remaining above the maximum required RPM. More headroom means faster recovery and margin for error. Target: &gt;30% (good), &gt;10% (minimum).</div>
+                            <div class="label">Headroom</div>
+                            <div class="value">${results.headroom.toFixed(1)}% ${statusIcon(results.headroom, 30, 10, false)}</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="tooltip">Percentage of wheel speed lost after launching one ball from 20ft distance. Lower means more consistent multi-shot accuracy. More flywheel mass reduces this. Target: &lt;15% (good), &lt;25% (acceptable).</div>
+                            <div class="label">Speed Drop (20ft)</div>
+                            <div class="value">${results.speed_drop_20.toFixed(1)}% ${statusIcon(results.speed_drop_20, 15, 25)}</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="tooltip">Time to spin up from idle speed to the RPM needed for 8ft shots. Affects how quickly you can shoot after acquiring a ball. Target: &lt;300ms (good), &lt;500ms (acceptable).</div>
+                            <div class="label">Spin-up (8ft)</div>
+                            <div class="value">${results.spinup_8_ms.toFixed(0)} ms ${statusIcon(results.spinup_8_ms, 300, 500)}</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="tooltip">Time to spin up from idle speed to the RPM needed for 20ft shots. Longer distance requires higher RPM, so spin-up takes longer. Target: &lt;400ms (good), &lt;600ms (acceptable).</div>
+                            <div class="label">Spin-up (20ft)</div>
+                            <div class="value">${results.spinup_20_ms.toFixed(0)} ms ${statusIcon(results.spinup_20_ms, 400, 600)}</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="tooltip">Time to spin up from the reduced RPM after shooting an 8ft shot back to the target RPM for the next shot. This affects how quickly you can take consecutive shots. Target: &lt;200ms (good), &lt;400ms (acceptable).</div>
+                            <div class="label">Spin-up Between Shots (8ft)</div>
+                            <div class="value">${results.spinup_between_8_ms.toFixed(0)} ms ${statusIcon(results.spinup_between_8_ms, 200, 400)}</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="tooltip">Time to spin up from the reduced RPM after shooting a 20ft shot back to the target RPM for the next shot. Longer shots cause more speed drop, so recovery takes longer. Target: &lt;300ms (good), &lt;500ms (acceptable).</div>
+                            <div class="label">Spin-up Between Shots (20ft)</div>
+                            <div class="value">${results.spinup_between_20_ms.toFixed(0)} ms ${statusIcon(results.spinup_between_20_ms, 300, 500)}</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="results-section">
+                    <h2>Shot Data Table</h2>
+                    <div class="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Distance (ft)</th>
+                                    <th>Exit Vel (m/s)</th>
+                                    <th>Exit Vel (ft/s)</th>
+                                    <th>Wheel RPM</th>
+                                    <th>Entry Angle (deg)</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+            `;
+            
+            const distances = [8, 10, 12, 14, 16, 18, 20];
+            distances.forEach(dist => {
+                const shot = results.shot_data[dist.toString()];
+                html += `
+                    <tr>
+                        <td>${dist}</td>
+                        <td>${shot.v_exit_ms.toFixed(2)}</td>
+                        <td>${shot.v_exit_fps.toFixed(1)}</td>
+                        <td>${shot.wheel_rpm.toFixed(0)}</td>
+                        <td>${shot.entry_angle.toFixed(1)}</td>
+                    </tr>
+                `;
+            });
+            
+            html += `
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                
+                <div class="results-section">
+                    <h2>RPM Lookup Table (for Robot Code)</h2>
+                    <pre class="code-block"><code>// Distance (ft) -> Wheel RPM
+const SHOOTER_RPM_TABLE = {
+            `;
+            
+            distances.forEach(dist => {
+                html += `    ${dist}: ${results.wheel_rpms[dist.toString()].toFixed(0)},\n`;
+            });
+            
+            html += `};</code></pre>
+                </div>
+            `;
+            
+            const recommendations = getRecommendations(config, results);
+            if (recommendations.length > 0) {
+                html += `
+                    <div class="recommendations">
+                        <h3>Recommendations</h3>
+                        <ul>
+                `;
+                recommendations.forEach(rec => {
+                    html += `<li>${rec}</li>`;
+                });
+                html += `
+                        </ul>
+                    </div>
+                `;
+            }
+            
+            html += `
+                <div class="results-section">
+                    <h2>Angle Comparison</h2>
+                    <div class="chart-container" id="angleChart"></div>
+                </div>
+                
+                <div class="results-section">
+                    <h2>RPM Requirements</h2>
+                    <div class="chart-container" id="rpmChart"></div>
+                </div>
+            `;
+            
+            resultsContent.innerHTML = html;
+            
+            // Create charts
+            createAngleChart(results);
+            createRPMChart(config, results);
+        }
+        
+        function getRecommendations(config, results) {
+            const recs = [];
+            
+            if (results.headroom < 10) {
+                recs.push('[!] Low headroom - increase gear ratio or use faster motor');
+            }
+            if (results.headroom < 0) {
+                recs.push('[X] CRITICAL: Exceeds motor free speed! Must increase gear ratio');
+            }
+            
+            if (results.speed_drop_20 > 25) {
+                recs.push('[!] High speed drop - consider more flywheel mass');
+            } else if (results.speed_drop_20 > 15) {
+                recs.push('[-] Speed drop slightly high - could add flywheel mass');
+            }
+            
+            if (results.spinup_20_ms > 600) {
+                recs.push('[!] Slow spin-up - reduce flywheel mass or increase gear ratio');
+            }
+            
+            if (results.spinup_between_20_ms > 500) {
+                recs.push('[!] Slow recovery between shots - consider more motors or less flywheel mass');
+            } else if (results.spinup_between_20_ms > 300) {
+                recs.push('[-] Recovery between shots slightly slow - could optimize for faster multi-shot');
+            }
+            
+            if (results.selected_angle !== results.optimal_angle) {
+                const diff = results.selected_score - results.optimal_score;
+                if (diff > 0.5) {
+                    recs.push(`[-] Angle ${results.optimal_angle}° has better consistency (score: ${results.optimal_score.toFixed(2)})`);
+                }
+            }
+            
+            if (recs.length === 0) {
+                recs.push('[OK] Configuration looks good!');
+            }
+            
+            return recs;
+        }
+        
+        function createAngleChart(results) {
+            const angles = results.all_angles.map(r => r.angle);
+            const scores = results.all_angles.map(r => r.score);
+            
+            const trace = {
+                x: angles,
+                y: scores,
+                type: 'bar',
+                marker: {
+                    color: angles.map(a => a === results.optimal_angle ? '#3fb950' : a === results.selected_angle ? '#d29922' : '#58a6ff')
+                }
+            };
+            
+            const layout = {
+                title: {
+                    text: 'Consistency Score by Angle (lower is better)',
+                    font: { color: '#e6edf3' }
+                },
+                xaxis: { 
+                    title: 'Shooter Angle (deg)',
+                    color: '#8b949e',
+                    gridcolor: '#30363d'
+                },
+                yaxis: { 
+                    title: 'Consistency Score',
+                    color: '#8b949e',
+                    gridcolor: '#30363d'
+                },
+                showlegend: false,
+                paper_bgcolor: '#161b22',
+                plot_bgcolor: '#161b22',
+                font: { color: '#e6edf3' }
+            };
+            
+            Plotly.newPlot('angleChart', [trace], layout);
+        }
+        
+        function createRPMChart(config, results) {
+            const distances = [8, 10, 12, 14, 16, 18, 20];
+            const rpms = distances.map(d => results.wheel_rpms[d.toString()]);
+            
+            const trace = {
+                x: distances,
+                y: rpms,
+                type: 'bar',
+                marker: { color: '#58a6ff' }
+            };
+            
+            const layout = {
+                title: {
+                    text: `Wheel RPM Requirements (${config.motor_name})`,
+                    font: { color: '#e6edf3' }
+                },
+                xaxis: { 
+                    title: 'Distance (ft)',
+                    color: '#8b949e',
+                    gridcolor: '#30363d'
+                },
+                yaxis: { 
+                    title: 'Required Wheel RPM',
+                    color: '#8b949e',
+                    gridcolor: '#30363d'
+                },
+                shapes: [{
+                    type: 'line',
+                    x0: 0,
+                    x1: 1,
+                    xref: 'paper',
+                    y0: results.eff_free_speed,
+                    y1: results.eff_free_speed,
+                    yref: 'y',
+                    line: { color: '#f85149', width: 2, dash: 'dash' }
+                }],
+                annotations: [{
+                    x: 20,
+                    y: results.eff_free_speed,
+                    text: `Eff. Free Speed (${results.eff_free_speed.toFixed(0)} RPM)`,
+                    showarrow: true,
+                    arrowhead: 2,
+                    ax: 0,
+                    ay: -30,
+                    font: { color: '#e6edf3' }
+                }],
+                showlegend: false,
+                paper_bgcolor: '#161b22',
+                plot_bgcolor: '#161b22',
+                font: { color: '#e6edf3' }
+            };
+            
+            Plotly.newPlot('rpmChart', [trace], layout);
+        }
+    </script>
+</body>
+</html>

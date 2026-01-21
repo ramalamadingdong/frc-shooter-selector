@@ -74,10 +74,10 @@ def get_default_config() -> Dict:
         'motor_stall_torque_nm': motor['stall_torque_nm'],
         'motor_peak_torque_nm': motor['peak_torque_nm'],
         'motor_stall_current_a': motor['stall_current_a'],
+        'wheels_per_side': 1,
         'motor_num_motors': 2,
         'motor_current_limit_a': motor['default_current_limit'],
         'motor_efficiency': 0.85,
-        'motor_thermal_derating': 0.80,
         'selected_angle': None,  # None = use optimal
         'idle_speed_rpm': 500,
         'gear_ratio': 2.0,
@@ -191,7 +191,7 @@ def calc_spinup_time(target_rpm: float, gear_ratio: float, moi_kg_m2: float,
     free_speed_rads = config['motor_free_speed_rpm'] * 2 * np.pi / 60
     kt = config['motor_stall_torque_nm'] / config['motor_stall_current_a']
     torque_at_limit = config['motor_current_limit_a'] * kt
-    usable_torque = min(config['motor_peak_torque_nm'], torque_at_limit) * config['motor_thermal_derating']
+    usable_torque = min(config['motor_peak_torque_nm'], torque_at_limit)
 
     target_rad_s = target_rpm * 2 * np.pi / 60
     motor_target_rad_s = target_rad_s * gear_ratio
@@ -221,7 +221,21 @@ def run_analysis(config: Dict) -> Dict:
     drag_coeff = config['drag_coefficient']
     slip_factor = config['slip_factor']
     wheel_diam_m = config['wheel_diameter_in'] * 0.0254
-    moi_lb_in2 = config['flywheel_moi_lb_in2']
+    
+    # Calculate total MOI including flywheel and wheels
+    flywheel_moi_lb_in2 = config['flywheel_moi_lb_in2']
+    
+    # Get wheel MOI (per wheel) - estimate from diameter if not specified
+    wheel_moi_lb_in2 = config.get('wheel_moi_lb_in2')
+    if wheel_moi_lb_in2 is None:
+        # Rough approximation: moi ≈ 0.225 * diameter^2
+        wheel_moi_lb_in2 = 0.225 * config['wheel_diameter_in'] ** 2
+    
+    # Total MOI = flywheel MOI + (wheel MOI per wheel × wheels per side × 2 sides)
+    wheels_per_side = config.get('wheels_per_side', 1)
+    total_wheel_moi_lb_in2 = wheel_moi_lb_in2 * wheels_per_side * 2
+    moi_lb_in2 = flywheel_moi_lb_in2 + total_wheel_moi_lb_in2
+    
     moi_kg_m2 = moi_lb_in2 / (1 / 0.453592 / (0.0254**2))
     gear_ratio = config['gear_ratio']
     idle_rpm = config['idle_speed_rpm']
@@ -541,7 +555,6 @@ def get_initial_config() -> Dict:
 
     # Advanced (optional)
     config['motor_efficiency'] = prompt_float("Motor efficiency", 0.85, 0.5, 1.0)
-    config['motor_thermal_derating'] = prompt_float("Thermal derating", 0.80, 0.5, 1.0)
 
     return config
 

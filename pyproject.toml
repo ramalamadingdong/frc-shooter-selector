@@ -2,10 +2,12 @@
 name = "shooter-analysis"
 version = "0.1.0"
 description = "FRC 2026 Shooter Analysis with Air Resistance"
-requires-python = ">=3.9"
+requires-python = ">=3.12"
 dependencies = [
     "numpy>=1.24.0",
     "matplotlib>=3.7.0",
+    "django>=5.0.0",
+    "plotly>=5.17.0",
 ]
 
 [dependency-groups]
@@ -15,7 +17,6 @@ dev = [
 
 [tool.ruff]
 line-length = 100
-target-version = "py39"
 
 [tool.ruff.lint]
 select = [
