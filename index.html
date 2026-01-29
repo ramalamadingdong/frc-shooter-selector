@@ -315,6 +315,110 @@
             font-size: 14px;
             line-height: 1.5;
         }
+        .slip-estimator-card {
+            background: #21262d;
+            border: 1px solid #30363d;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            overflow: hidden;
+        }
+        .slip-estimator-toggle {
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 14px 18px;
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            color: #e6edf3;
+            font-size: 16px;
+            font-weight: 600;
+            text-align: left;
+            transition: background 0.2s;
+        }
+        .slip-estimator-toggle:hover {
+            background: #30363d;
+        }
+        .slip-estimator-chevron {
+            display: inline-block;
+            width: 0;
+            height: 0;
+            margin-left: 8px;
+            border-left: 5px solid transparent;
+            border-right: 5px solid transparent;
+            border-top: 6px solid #8b949e;
+            transition: transform 0.2s;
+        }
+        .slip-estimator-toggle[aria-expanded="true"] .slip-estimator-chevron {
+            transform: rotate(180deg);
+        }
+        .slip-estimator-body {
+            padding: 0 18px 18px 18px;
+        }
+        .slip-estimator-body[hidden] {
+            display: none;
+        }
+        .slip-estimator-title { color: inherit; }
+        .slip-estimator-desc {
+            color: #8b949e;
+            font-size: 13px;
+            margin-bottom: 14px;
+            margin-top: 0;
+            line-height: 1.5;
+        }
+        .slip-estimator-card .form-group { margin-bottom: 14px; }
+        .slip-estimator-card input[readonly] {
+            background: #0d1117;
+            color: #8b949e;
+            cursor: default;
+        }
+        .optional { color: #6e7681; font-weight: 400; font-size: 12px; }
+        .btn-secondary {
+            background: linear-gradient(135deg, #21262d 0%, #30363d 100%);
+            color: #e6edf3;
+            border: 1px solid #484f58;
+            margin-bottom: 12px;
+        }
+        .btn-secondary:hover {
+            background: linear-gradient(135deg, #30363d 0%, #484f58 100%);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
+        .slip-estimate-result {
+            margin-top: 14px;
+            padding-top: 14px;
+            border-top: 1px solid #30363d;
+        }
+        .slip-estimate-metrics {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+        .slip-metric {
+            background: #0d1117;
+            padding: 10px 14px;
+            border-radius: 6px;
+            border: 1px solid #30363d;
+        }
+        .slip-metric-main { border-left: 4px solid #58a6ff; }
+        .slip-metric-label {
+            display: block;
+            font-size: 11px;
+            color: #8b949e;
+            text-transform: uppercase;
+            margin-bottom: 4px;
+        }
+        .slip-metric-value { font-size: 18px; font-weight: 700; color: #e6edf3; }
+        .btn-use-estimate {
+            background: linear-gradient(135deg, #1f6feb 0%, #388bfd 100%);
+            padding: 10px 20px;
+            font-size: 14px;
+        }
+        .btn-use-estimate:hover {
+            box-shadow: 0 5px 15px rgba(56, 139, 253, 0.4);
+        }
+        .slip-estimate-error { margin-top: 10px; }
         @media (max-width: 1024px) {
             .main-content {
                 grid-template-columns: 1fr;
@@ -432,6 +536,58 @@
                     </div>
                     
                     <div class="form-group">
+                        <label for="ball_incoming_velocity">Ball Incoming Velocity (m/s)</label>
+                        <input type="number" id="ball_incoming_velocity" name="ball_incoming_velocity" value="0" step="0.1" min="0" max="10">
+                        <small>Velocity of the ball before entering the shooter (from feeding mechanism). Reduces the velocity the wheels need to add.</small>
+                    </div>
+                    
+                    <div class="slip-estimator-card">
+                        <button type="button" class="slip-estimator-toggle" id="slipEstimatorToggle" aria-expanded="false" aria-controls="slipEstimatorBody">
+                            <span class="slip-estimator-title">Estimate Slip/Compression Factor</span>
+                            <span class="slip-estimator-chevron" aria-hidden="true"></span>
+                        </button>
+                        <div id="slipEstimatorBody" class="slip-estimator-body" hidden>
+                        <p class="slip-estimator-desc">Use center-to-center distance and wheel type to get a suggested slip factor. Surface gap = center-to-center minus wheel diameter; compression = 5.9 in (ball) minus that gap.</p>
+                        <div class="form-group">
+                            <label for="center_to_center">Distance between wheel centers (in)</label>
+                            <input type="number" id="center_to_center" step="0.01" min="4" max="11" placeholder="e.g. 9.4" value="">
+                            <small>Center-to-center distance between the two wheel axes. Surface gap = center-to-center minus wheel diameter (from wheel type below).</small>
+                        </div>
+                        <div class="form-group">
+                            <label>Wheel diameter</label>
+                            <input type="text" id="estimator_wheel_diameter_display" readonly placeholder="Select wheel type below">
+                            <small>Uses the Wheel Type / Wheel Diameter from this form. Circumference = pi × diameter.</small>
+                        </div>
+                        <div class="form-group">
+                            <label for="estimator_wheel_width">Wheel width (in) <span class="optional">optional</span></label>
+                            <input type="number" id="estimator_wheel_width" step="0.1" min="0.5" max="3" placeholder="1.0">
+                            <small>Optional refinement; contact area is hard to estimate because wheels and ball are curved.</small>
+                        </div>
+                        <div class="form-group">
+                            <label for="estimator_contact_area">Contact surface area (in²) <span class="optional">optional</span></label>
+                            <input type="number" id="estimator_contact_area" step="0.1" min="0" max="20" placeholder="e.g. 4">
+                            <small>With constant-curvature wheels and a round ball, actual contact is hard to measure; the main estimate uses center-to-center and entry speed.</small>
+                        </div>
+                        <div class="form-group">
+                            <label>Ball incoming velocity</label>
+                            <input type="text" id="estimator_entry_speed_display" readonly placeholder="Uses value from form">
+                            <small>Uses the Ball Incoming Velocity (m/s) from this form when you click Estimate.</small>
+                        </div>
+                        <button type="button" class="btn btn-secondary" id="estimateSlipBtn">Estimate</button>
+                        <div id="slip_estimate_result" class="slip-estimate-result" style="display: none;">
+                            <div class="slip-estimate-metrics">
+                                <div class="slip-metric"><span class="slip-metric-label">Surface gap</span><span id="result_gap" class="slip-metric-value"></span> in</div>
+                                <div class="slip-metric"><span class="slip-metric-label">Compression</span><span id="result_compression" class="slip-metric-value"></span> in</div>
+                                <div class="slip-metric"><span class="slip-metric-label">Wheel circumference</span><span id="result_circumference" class="slip-metric-value"></span> in</div>
+                                <div class="slip-metric slip-metric-main"><span class="slip-metric-label">Estimated slip factor</span><span id="result_slip_factor" class="slip-metric-value"></span></div>
+                            </div>
+                            <button type="button" class="btn btn-use-estimate" id="useEstimateBtn">Use this value</button>
+                        </div>
+                        <div id="slip_estimate_error" class="error slip-estimate-error" style="display: none;"></div>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
                         <label for="slip_factor">Slip/Compression Factor</label>
                         <input type="number" id="slip_factor" name="slip_factor" value="1.15" step="0.01" min="1.0" max="1.3">
                         <small>
@@ -491,6 +647,32 @@
         const DELTA_Y = RIM_HEIGHT_M - EXIT_HEIGHT_M;
         const DISTANCES_FT = [8, 10, 12, 14, 16, 18, 20];
         const DISTANCES_M = DISTANCES_FT.map(d => d * 0.3048);
+        const BALL_DIAMETER_IN = 5.9;
+
+        function estimateSlipFactor(centerToCenterIn, wheelDiamIn, wheelWidthIn, contactAreaIn2, ballIncomingMs) {
+            const gap = Math.max(0.1, Math.min(centerToCenterIn - wheelDiamIn, BALL_DIAMETER_IN - 0.1));
+            const compressionIn = BALL_DIAMETER_IN - gap;
+            const wheelCircumferenceIn = Math.PI * wheelDiamIn;
+            let slip = 1.0 + 0.18 * compressionIn;
+            slip += 0.008 * Math.max(0, ballIncomingMs);
+            if (contactAreaIn2 != null && contactAreaIn2 > 0) {
+                const areaFactor = Math.min(8, contactAreaIn2);
+                slip -= 0.004 * (areaFactor - 3);
+            }
+            if (wheelWidthIn != null && wheelWidthIn > 0 && (contactAreaIn2 == null || contactAreaIn2 <= 0)) {
+                const rBall = BALL_DIAMETER_IN / 2;
+                const chord = 2 * Math.sqrt(Math.max(0, rBall * rBall - Math.pow(rBall - compressionIn / 2, 2)));
+                const estimatedArea = 2 * wheelWidthIn * chord;
+                if (estimatedArea > 0) slip -= 0.004 * (Math.min(8, estimatedArea) - 3);
+            }
+            slip = Math.max(1.0, Math.min(1.3, slip));
+            return {
+                compression_in: Math.round(compressionIn * 1000) / 1000,
+                wheel_circumference_in: Math.round(wheelCircumferenceIn * 1000) / 1000,
+                estimated_slip_factor: Math.round(slip * 1000) / 1000,
+                gap_between_wheels_in: Math.round(gap * 1000) / 1000
+            };
+        }
 
         // Presets
         const MOTOR_PRESETS = {
@@ -717,20 +899,20 @@
             return [dxdv, dxda];
         }
 
-        function calcSpeedDrop(initialRpm, exitVelMs, moiKgM2, efficiency = 0.70) {
+        function calcSpeedDrop(initialRpm, exitVelMs, moiKgM2, efficiency = 0.70, ballIncomingMs = 0) {
             const omegaInitial = initialRpm * 2 * Math.PI / 60;
             const EFlywheel = 0.5 * moiKgM2 * omegaInitial ** 2;
-            const EBall = 0.5 * BALL_MASS_KG * exitVelMs ** 2;
+            const EBall = 0.5 * BALL_MASS_KG * (exitVelMs ** 2 - ballIncomingMs ** 2);
             const ETaken = EBall / efficiency;
             const ENew = Math.max(0, EFlywheel - ETaken);
             const omegaFinal = ENew > 0 ? Math.sqrt(2 * ENew / moiKgM2) : 0;
             return omegaInitial > 0 ? ((omegaInitial - omegaFinal) / omegaInitial) * 100 : 100;
         }
 
-        function calcRpmAfterShot(initialRpm, exitVelMs, moiKgM2, efficiency = 0.70) {
+        function calcRpmAfterShot(initialRpm, exitVelMs, moiKgM2, efficiency = 0.70, ballIncomingMs = 0) {
             const omegaInitial = initialRpm * 2 * Math.PI / 60;
             const EFlywheel = 0.5 * moiKgM2 * omegaInitial ** 2;
-            const EBall = 0.5 * BALL_MASS_KG * exitVelMs ** 2;
+            const EBall = 0.5 * BALL_MASS_KG * (exitVelMs ** 2 - ballIncomingMs ** 2);
             const ETaken = EBall / efficiency;
             const ENew = Math.max(0, EFlywheel - ETaken);
             const omegaFinal = ENew > 0 ? Math.sqrt(2 * ENew / moiKgM2) : 0;
@@ -795,6 +977,7 @@
             const dragCoeff = config.drag_coefficient;
             const slipFactor = config.slip_factor;
             const wheelDiamM = config.wheel_diameter_in * 0.0254;
+            const ballIncomingVelocity = config.ball_incoming_velocity_ms != null ? config.ball_incoming_velocity_ms : 0;
 
             const [moiLbIn2, moiKgM2] = calculateTotalMOI(config);
             const gearRatio = config.gear_ratio;
@@ -868,12 +1051,14 @@
             for (let i = 0; i < DISTANCES_FT.length; i++) {
                 const distFt = DISTANCES_FT[i];
                 const vExit = selected.velocities[i];
-                const surfaceSpeed = vExit * slipFactor;
+                const vWheelContribution = Math.max(0, vExit - ballIncomingVelocity);
+                const surfaceSpeed = vWheelContribution * slipFactor;
                 const wheelRpm = (surfaceSpeed / (Math.PI * wheelDiamM)) * 60;
                 wheelRpms[distFt] = wheelRpm;
                 shotData[distFt] = {
                     v_exit_ms: vExit,
                     v_exit_fps: vExit / 0.3048,
+                    v_wheel_contribution_ms: vWheelContribution,
                     wheel_rpm: wheelRpm,
                     entry_angle: selected.entryAngles[i]
                 };
@@ -883,12 +1068,12 @@
             const maxRpm = Math.max(...Object.values(wheelRpms));
             const headroom = (1 - maxRpm / effFreeSpeed) * 100;
 
-            const speedDrop20 = calcSpeedDrop(wheelRpms[20], shotData[20].v_exit_ms, moiKgM2);
+            const speedDrop20 = calcSpeedDrop(wheelRpms[20], shotData[20].v_exit_ms, moiKgM2, 0.70, ballIncomingVelocity);
             const spinup8 = calcSpinupTime(wheelRpms[8], gearRatio, moiKgM2, idleRpm, config) * 1000;
             const spinup20 = calcSpinupTime(wheelRpms[20], gearRatio, moiKgM2, idleRpm, config) * 1000;
 
-            const rpmAfterShot8 = calcRpmAfterShot(wheelRpms[8], shotData[8].v_exit_ms, moiKgM2);
-            const rpmAfterShot20 = calcRpmAfterShot(wheelRpms[20], shotData[20].v_exit_ms, moiKgM2);
+            const rpmAfterShot8 = calcRpmAfterShot(wheelRpms[8], shotData[8].v_exit_ms, moiKgM2, 0.70, ballIncomingVelocity);
+            const rpmAfterShot20 = calcRpmAfterShot(wheelRpms[20], shotData[20].v_exit_ms, moiKgM2, 0.70, ballIncomingVelocity);
             const spinupBetween8 = calcSpinupTimeFromRpm(wheelRpms[8], rpmAfterShot8, gearRatio, moiKgM2, config) * 1000;
             const spinupBetween20 = calcSpinupTimeFromRpm(wheelRpms[20], rpmAfterShot20, gearRatio, moiKgM2, config) * 1000;
 
@@ -910,6 +1095,7 @@
                 spinup_between_8_ms: spinupBetween8,
                 spinup_between_20_ms: spinupBetween20,
                 total_moi_lb_in2: moiLbIn2,
+                ball_incoming_velocity_ms: ballIncomingVelocity,
                 wheel_rpms: wheelRpms,
                 shot_data: shotData,
                 all_angles: angleResults,
@@ -946,7 +1132,63 @@
                     wheelDiameterInput.value = diameter;
                 }
             }
+            updateSlipEstimatorDisplays();
         });
+
+        document.getElementById('ball_incoming_velocity').addEventListener('input', updateSlipEstimatorDisplays);
+
+        function updateSlipEstimatorDisplays() {
+            const wheelOpt = wheelTypeSelect.options[wheelTypeSelect.selectedIndex];
+            const diameter = wheelOpt.dataset.diameter || wheelDiameterInput.value;
+            document.getElementById('estimator_wheel_diameter_display').value = diameter ? diameter + ' in' : '';
+            document.getElementById('estimator_entry_speed_display').value = document.getElementById('ball_incoming_velocity').value + ' m/s';
+        }
+
+        document.getElementById('slipEstimatorToggle').addEventListener('click', function() {
+            const body = document.getElementById('slipEstimatorBody');
+            const isOpen = body.hidden;
+            body.hidden = !isOpen;
+            this.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+        });
+
+        document.getElementById('estimateSlipBtn').addEventListener('click', function() {
+            const centerToCenter = parseFloat(document.getElementById('center_to_center').value);
+            const wheelDiam = parseFloat(document.getElementById('wheel_diameter').value);
+            const ballIncoming = parseFloat(document.getElementById('ball_incoming_velocity').value) || 0;
+            const wheelWidthRaw = document.getElementById('estimator_wheel_width').value;
+            const contactAreaRaw = document.getElementById('estimator_contact_area').value;
+            if (isNaN(wheelDiam) || wheelDiam <= 0) {
+                document.getElementById('slip_estimate_error').textContent = 'Select a wheel type below to set diameter.';
+                document.getElementById('slip_estimate_error').style.display = 'block';
+                document.getElementById('slip_estimate_result').style.display = 'none';
+                return;
+            }
+            const minCc = wheelDiam + 0.1;
+            const maxCc = wheelDiam + 5.8;
+            if (isNaN(centerToCenter) || centerToCenter < minCc || centerToCenter > maxCc) {
+                document.getElementById('slip_estimate_error').textContent = 'Enter a valid center-to-center distance (' + minCc.toFixed(1) + ' to ' + maxCc.toFixed(1) + ' in for ' + wheelDiam + '" wheels).';
+                document.getElementById('slip_estimate_error').style.display = 'block';
+                document.getElementById('slip_estimate_result').style.display = 'none';
+                return;
+            }
+            document.getElementById('slip_estimate_error').style.display = 'none';
+            const wheelWidth = wheelWidthRaw !== '' ? parseFloat(wheelWidthRaw) : null;
+            const contactArea = contactAreaRaw !== '' ? parseFloat(contactAreaRaw) : null;
+            const data = estimateSlipFactor(centerToCenter, wheelDiam, wheelWidth, contactArea, ballIncoming);
+            document.getElementById('result_gap').textContent = data.gap_between_wheels_in;
+            document.getElementById('result_compression').textContent = data.compression_in;
+            document.getElementById('result_circumference').textContent = data.wheel_circumference_in;
+            document.getElementById('result_slip_factor').textContent = data.estimated_slip_factor;
+            document.getElementById('slip_estimate_result').style.display = 'block';
+            document.getElementById('useEstimateBtn').dataset.estimatedSlip = data.estimated_slip_factor;
+        });
+
+        document.getElementById('useEstimateBtn').addEventListener('click', function() {
+            const val = this.dataset.estimatedSlip;
+            if (val) document.getElementById('slip_factor').value = val;
+        });
+
+        updateSlipEstimatorDisplays();
 
         document.getElementById('motor').addEventListener('change', function() {
             const selectedMotor = this.options[this.selectedIndex];
@@ -973,6 +1215,7 @@
                 gear_ratio: parseFloat(document.getElementById('gear_ratio').value),
                 drag_coefficient: parseFloat(document.getElementById('drag_coefficient').value),
                 slip_factor: parseFloat(document.getElementById('slip_factor').value),
+                ball_incoming_velocity_ms: parseFloat(document.getElementById('ball_incoming_velocity').value) || 0,
                 wheel_diameter_in: parseFloat(document.getElementById('wheel_diameter').value),
             };
             
@@ -1076,7 +1319,12 @@
                         <div class="metric-card">
                             <div class="tooltip">Total Moment of Inertia per side (flywheel + wheels). Higher MOI stores more energy for consistent multi-shot accuracy but takes longer to spin up.</div>
                             <div class="label">Total MOI</div>
-                            <div class="value">${results.total_moi_lb_in2.toFixed(1)} lb-in²</div>
+                            <div class="value">${(results.total_moi_lb_in2 ?? 0).toFixed(1)} lb-in²</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="tooltip">Ball velocity before entering the shooter (from feeding mechanism). Reduces the velocity the wheels need to add.</div>
+                            <div class="label">Ball Incoming Vel</div>
+                            <div class="value">${(results.ball_incoming_velocity_ms ?? 0).toFixed(1)} m/s</div>
                         </div>
                     </div>
                 </div>
@@ -1151,6 +1399,7 @@
                                     <th>Distance (ft)</th>
                                     <th>Exit Vel (m/s)</th>
                                     <th>Exit Vel (ft/s)</th>
+                                    ${(results.ball_incoming_velocity_ms ?? 0) > 0 ? '<th>Wheel Contrib (m/s)</th>' : ''}
                                     <th>Wheel RPM</th>
                                     <th>Entry Angle (deg)</th>
                                 </tr>
@@ -1158,15 +1407,18 @@
                             <tbody>
             `;
             
+            const hasIncomingVel = (results.ball_incoming_velocity_ms ?? 0) > 0;
             DISTANCES_FT.forEach(dist => {
                 const shot = results.shot_data[dist];
+                const vWheelContrib = shot.v_wheel_contribution_ms != null ? shot.v_wheel_contribution_ms : (shot.v_exit_ms ?? 0);
                 html += `
                     <tr>
                         <td>${dist}</td>
-                        <td>${shot.v_exit_ms.toFixed(2)}</td>
-                        <td>${shot.v_exit_fps.toFixed(1)}</td>
-                        <td>${shot.wheel_rpm.toFixed(0)}</td>
-                        <td>${shot.entry_angle.toFixed(1)}</td>
+                        <td>${(shot.v_exit_ms ?? 0).toFixed(2)}</td>
+                        <td>${(shot.v_exit_fps ?? 0).toFixed(1)}</td>
+                        ${hasIncomingVel ? `<td>${vWheelContrib.toFixed(2)}</td>` : ''}
+                        <td>${(shot.wheel_rpm ?? 0).toFixed(0)}</td>
+                        <td>${(shot.entry_angle ?? 0).toFixed(1)}</td>
                     </tr>
                 `;
             });
