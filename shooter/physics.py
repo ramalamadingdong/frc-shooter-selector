@@ -90,7 +90,8 @@ GEAR_RATIOS = {'1': 1.0, '2': 1.5, '3': 2.0, '4': 2.5, '5': 3.0}
 
 # Physics constants
 G = 9.81  # m/s^2
-BALL_DIAMETER_M = 5.9 * 0.0254
+BALL_DIAMETER_IN = 5.9  # FRC game ball nominal diameter (inches)
+BALL_DIAMETER_M = BALL_DIAMETER_IN * 0.0254
 BALL_RADIUS_M = BALL_DIAMETER_M / 2
 BALL_MASS_KG = 0.5 * 0.453592
 BALL_CROSS_SECTION = np.pi * BALL_RADIUS_M**2
@@ -156,6 +157,76 @@ def calculate_total_moi(config: Dict) -> Tuple[float, float]:
     return total_moi_lb_in2, total_moi_kg_m2
 
 
+def estimate_slip_factor(
+    center_to_center_in: float,
+    wheel_diameter_in: float,
+    wheel_width_in: Optional[float] = None,
+    contact_area_in2: Optional[float] = None,
+    ball_incoming_velocity_ms: float = 0.0,
+) -> Dict:
+    """
+    Estimate slip/compression factor from geometry and entry speed.
+
+    The ball is compressed between the wheels. User provides center-to-center
+    distance between wheel axes; surface gap = center_to_center - wheel_diameter.
+    Compression = ball_diameter - gap. More compression increases deformation
+    and typically requires higher wheel surface speed (slip factor > 1).
+
+    Args:
+        center_to_center_in: Distance between wheel centers/axes (inches).
+        wheel_diameter_in: Wheel diameter from selected wheel type (inches).
+        wheel_width_in: Optional wheel width (inches). Contact area is hard to
+            estimate with curved wheels/ball; this is an optional refinement.
+        contact_area_in2: Optional total contact surface area wheel-ball (in^2).
+            Optional refinement; curved surfaces make actual contact hard to measure.
+        ball_incoming_velocity_ms: Ball velocity before entering shooter (m/s).
+
+    Returns:
+        Dict with compression_in, wheel_circumference_in, estimated_slip_factor,
+        gap_between_wheels_in (surface gap), and inputs echoed.
+    """
+    wheel_d = float(wheel_diameter_in)
+    cc = float(center_to_center_in)
+    # Surface gap = center-to-center minus one full wheel diameter (one radius per side)
+    gap_surface = cc - wheel_d
+    gap_surface = max(0.1, min(gap_surface, BALL_DIAMETER_IN - 0.1))
+    compression_in = BALL_DIAMETER_IN - gap_surface
+    wheel_circumference_in = np.pi * wheel_d
+
+    # Base slip from compression: empirical. More squeeze -> more deformation -> higher slip.
+    # Typical: 0.3" compression -> ~1.05, 0.6" -> ~1.11, 1.0" -> ~1.18
+    k_compression = 0.18  # per inch of compression
+    slip = 1.0 + k_compression * compression_in
+
+    # Higher entry speed: ball spends less time in contact, can increase effective slip slightly.
+    slip += 0.008 * max(0.0, ball_incoming_velocity_ms)
+
+    # If user provided contact area and we have width (or can estimate), more contact can mean better grip.
+    if contact_area_in2 is not None and contact_area_in2 > 0:
+        # Total contact area is typically 2 sides. Larger area -> slightly lower slip.
+        # Rough correction: assume "typical" contact is ~3 in^2 total -> no change; 6 in^2 -> -0.02
+        area_factor = min(8.0, contact_area_in2)
+        slip -= 0.004 * (area_factor - 3.0)  # center at 3 in^2
+    if wheel_width_in is not None and wheel_width_in > 0 and contact_area_in2 is None:
+        # Estimate contact length from compression (chord on ball). contact_length ~ 2*sqrt(r^2 - (r - comp/2)^2)
+        r_ball = BALL_DIAMETER_IN / 2
+        chord = 2 * np.sqrt(max(0, r_ball**2 - (r_ball - compression_in / 2) ** 2))
+        estimated_area = 2 * wheel_width_in * chord  # both sides
+        if estimated_area > 0:
+            slip -= 0.004 * (min(8.0, estimated_area) - 3.0)
+
+    slip = max(1.0, min(1.3, float(slip)))
+    return {
+        'compression_in': round(compression_in, 3),
+        'wheel_circumference_in': round(wheel_circumference_in, 3),
+        'estimated_slip_factor': round(slip, 3),
+        'gap_between_wheels_in': round(gap_surface, 3),
+        'center_to_center_in': round(cc, 3),
+        'wheel_diameter_in': wheel_d,
+        'ball_incoming_velocity_ms': ball_incoming_velocity_ms,
+    }
+
+
 def get_default_config() -> Dict:
     """Return default configuration."""
     motor = MOTOR_PRESETS['1']
@@ -172,16 +243,14 @@ def get_default_config() -> Dict:
         'selected_angle': None,  # None = use optimal
         'idle_speed_rpm': 500,
         'gear_ratio': 2.0,
-        'flywheel_name': 'WCP + Dual Stealth (Recommended)',
-        # Note: This preset value may already include wheels in some calculations.
-        # The calculate_total_moi() function will add wheel MOI separately.
-        # If your preset already includes wheels, you may need to adjust manually.
-        'flywheel_moi_lb_in2': 14.76,
+        'flywheel_name': 'None (wheels only)',
+        'flywheel_moi_lb_in2': 0.0,
         'wheel_type': '1',  # Default to 4" Thrifty Bot Urethane (45A)
         'wheel_moi_lb_in2': None,  # Will be calculated from wheel_type if None
         'drag_coefficient': 0.50,
         'slip_factor': 1.15,
         'wheel_diameter_in': 4.0,
+        'ball_incoming_velocity_ms': 0.0,  # Ball velocity before entering shooter (m/s)
     }
 
 
@@ -308,22 +377,42 @@ def calc_sensitivity(angle_deg: float, v0: float, drag_coeff: float) -> Tuple[fl
     return dxdv, dxda
 
 
-def calc_speed_drop(initial_rpm: float, exit_vel_ms: float, moi_kg_m2: float, efficiency: float = 0.70) -> float:
-    """Calculate percentage speed drop after launching a ball."""
+def calc_speed_drop(initial_rpm: float, exit_vel_ms: float, moi_kg_m2: float, 
+                    efficiency: float = 0.70, ball_incoming_vel_ms: float = 0.0) -> float:
+    """Calculate percentage speed drop after launching a ball.
+    
+    Args:
+        initial_rpm: Wheel RPM before shot
+        exit_vel_ms: Total ball exit velocity (m/s)
+        moi_kg_m2: Moment of inertia (kg*m^2)
+        efficiency: Energy transfer efficiency
+        ball_incoming_vel_ms: Ball velocity before entering shooter (m/s)
+    """
     omega_initial = initial_rpm * 2 * np.pi / 60
     E_flywheel = 0.5 * moi_kg_m2 * omega_initial**2
-    E_ball = 0.5 * BALL_MASS_KG * exit_vel_ms**2
+    # Energy imparted is the change in ball kinetic energy
+    E_ball = 0.5 * BALL_MASS_KG * (exit_vel_ms**2 - ball_incoming_vel_ms**2)
     E_taken = E_ball / efficiency
     E_new = max(0, E_flywheel - E_taken)
     omega_final = np.sqrt(2 * E_new / moi_kg_m2) if E_new > 0 else 0
     return ((omega_initial - omega_final) / omega_initial) * 100 if omega_initial > 0 else 100
 
 
-def calc_rpm_after_shot(initial_rpm: float, exit_vel_ms: float, moi_kg_m2: float, efficiency: float = 0.70) -> float:
-    """Calculate RPM after launching a ball (returns the reduced RPM)."""
+def calc_rpm_after_shot(initial_rpm: float, exit_vel_ms: float, moi_kg_m2: float, 
+                        efficiency: float = 0.70, ball_incoming_vel_ms: float = 0.0) -> float:
+    """Calculate RPM after launching a ball (returns the reduced RPM).
+    
+    Args:
+        initial_rpm: Wheel RPM before shot
+        exit_vel_ms: Total ball exit velocity (m/s)
+        moi_kg_m2: Moment of inertia (kg*m^2)
+        efficiency: Energy transfer efficiency
+        ball_incoming_vel_ms: Ball velocity before entering shooter (m/s)
+    """
     omega_initial = initial_rpm * 2 * np.pi / 60
     E_flywheel = 0.5 * moi_kg_m2 * omega_initial**2
-    E_ball = 0.5 * BALL_MASS_KG * exit_vel_ms**2
+    # Energy imparted is the change in ball kinetic energy
+    E_ball = 0.5 * BALL_MASS_KG * (exit_vel_ms**2 - ball_incoming_vel_ms**2)
     E_taken = E_ball / efficiency
     E_new = max(0, E_flywheel - E_taken)
     omega_final = np.sqrt(2 * E_new / moi_kg_m2) if E_new > 0 else 0
@@ -461,28 +550,37 @@ def run_analysis(config: Dict) -> Dict:
     else:
         selected = optimal
 
+    # Ball incoming velocity (pre-acceleration from feeding mechanism)
+    ball_incoming_velocity = config.get('ball_incoming_velocity_ms', 0.0)
+    
     wheel_rpms = {}
     shot_data = {}
     for i, dist_ft in enumerate(DISTANCES_FT):
         v_exit = selected['velocities'][i]
-        surface_speed = v_exit * slip_factor
+        # The wheels only need to add the difference between exit velocity and incoming velocity
+        v_wheel_contribution = max(0, v_exit - ball_incoming_velocity)
+        surface_speed = v_wheel_contribution * slip_factor
         wheel_rpm = (surface_speed / (np.pi * wheel_diam_m)) * 60
         wheel_rpms[dist_ft] = wheel_rpm
         shot_data[dist_ft] = {
             'v_exit_ms': v_exit, 'v_exit_fps': ms_to_fps(v_exit),
+            'v_wheel_contribution_ms': v_wheel_contribution,
             'wheel_rpm': wheel_rpm, 'entry_angle': selected['entry_angles'][i]
         }
 
     min_rpm, max_rpm = min(wheel_rpms.values()), max(wheel_rpms.values())
     headroom = (1 - max_rpm / eff_free_speed) * 100
 
-    speed_drop_20 = calc_speed_drop(wheel_rpms[20], shot_data[20]['v_exit_ms'], moi_kg_m2)
+    speed_drop_20 = calc_speed_drop(wheel_rpms[20], shot_data[20]['v_exit_ms'], moi_kg_m2,
+                                     ball_incoming_vel_ms=ball_incoming_velocity)
     spinup_8 = calc_spinup_time(wheel_rpms[8], gear_ratio, moi_kg_m2, idle_rpm, config) * 1000
     spinup_20 = calc_spinup_time(wheel_rpms[20], gear_ratio, moi_kg_m2, idle_rpm, config) * 1000
 
     # Calculate spin-up time between shots (from reduced RPM after shot back to target RPM)
-    rpm_after_shot_8 = calc_rpm_after_shot(wheel_rpms[8], shot_data[8]['v_exit_ms'], moi_kg_m2)
-    rpm_after_shot_20 = calc_rpm_after_shot(wheel_rpms[20], shot_data[20]['v_exit_ms'], moi_kg_m2)
+    rpm_after_shot_8 = calc_rpm_after_shot(wheel_rpms[8], shot_data[8]['v_exit_ms'], moi_kg_m2,
+                                            ball_incoming_vel_ms=ball_incoming_velocity)
+    rpm_after_shot_20 = calc_rpm_after_shot(wheel_rpms[20], shot_data[20]['v_exit_ms'], moi_kg_m2,
+                                             ball_incoming_vel_ms=ball_incoming_velocity)
     spinup_between_8 = calc_spinup_time_from_rpm(wheel_rpms[8], rpm_after_shot_8, gear_ratio, moi_kg_m2, config) * 1000
     spinup_between_20 = calc_spinup_time_from_rpm(wheel_rpms[20], rpm_after_shot_20, gear_ratio, moi_kg_m2, config) * 1000
 
@@ -504,6 +602,7 @@ def run_analysis(config: Dict) -> Dict:
         'spinup_between_8_ms': spinup_between_8,
         'spinup_between_20_ms': spinup_between_20,
         'total_moi_lb_in2': moi_lb_in2,  # Total MOI including flywheel and wheels
+        'ball_incoming_velocity_ms': ball_incoming_velocity,
         'wheel_rpms': wheel_rpms,
         'shot_data': shot_data,
         'all_angles': angle_results,

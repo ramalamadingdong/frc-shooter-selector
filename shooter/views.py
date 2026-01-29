@@ -4,8 +4,8 @@ from django.http import JsonResponse
 from django.shortcuts import render
 from django.views.decorators.csrf import csrf_exempt
 from shooter.physics import (
-    get_default_config, run_analysis, MOTOR_PRESETS,
-    FLYWHEEL_PRESETS, GEAR_RATIOS, WHEEL_PRESETS
+    get_default_config, run_analysis, estimate_slip_factor,
+    MOTOR_PRESETS, FLYWHEEL_PRESETS, GEAR_RATIOS, WHEEL_PRESETS,
 )
 
 logger = logging.getLogger(__name__)
@@ -53,6 +53,7 @@ def analyze(request):
             'drag_coefficient': float(data.get('drag_coefficient', 0.50)),
             'slip_factor': float(data.get('slip_factor', 1.15)),
             'wheel_diameter_in': float(data.get('wheel_diameter_in', 4.0)),
+            'ball_incoming_velocity_ms': float(data.get('ball_incoming_velocity_ms', 0.0)),
         }
 
         logger.info(f'Running analysis with config: motor={config["motor_name"]}, angle={config["selected_angle"]}')
@@ -68,6 +69,7 @@ def analyze(request):
                     'v_exit_fps': float(v['v_exit_fps']),
                     'wheel_rpm': float(v['wheel_rpm']),
                     'entry_angle': float(v['entry_angle']),
+                    'v_wheel_contribution_ms': float(v.get('v_wheel_contribution_ms', v['v_exit_ms'])),
                 }
                 for k, v in results['shot_data'].items()
             }
@@ -111,3 +113,34 @@ def analyze(request):
     except Exception as e:
         logger.exception('Unexpected error in analyze endpoint')
         return JsonResponse({'error': f'Analysis failed: {str(e)}'}, status=500)
+
+
+@csrf_exempt
+def estimate_slip(request):
+    """API endpoint to estimate slip/compression factor from geometry and entry speed."""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+    try:
+        data = json.loads(request.body)
+        center_to_center = float(data.get('center_to_center_in'))
+        wheel_diameter = float(data.get('wheel_diameter_in'))
+        def opt_float(v):
+            if v is None or v == '':
+                return None
+            try:
+                return float(v)
+            except (TypeError, ValueError):
+                return None
+        wheel_width = opt_float(data.get('wheel_width_in'))
+        contact_area = opt_float(data.get('contact_area_in2'))
+        ball_incoming = float(data.get('ball_incoming_velocity_ms', 0.0))
+        result = estimate_slip_factor(
+            center_to_center_in=center_to_center,
+            wheel_diameter_in=wheel_diameter,
+            wheel_width_in=wheel_width,
+            contact_area_in2=contact_area,
+            ball_incoming_velocity_ms=ball_incoming,
+        )
+        return JsonResponse(result)
+    except (json.JSONDecodeError, TypeError, ValueError) as e:
+        return JsonResponse({'error': str(e)}, status=400)
